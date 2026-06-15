@@ -1,0 +1,1798 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1C1C1E">
+<title>AI 가계부</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+
+<style>
+/* ── 전역 리셋 & 기본 ── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg:        #F2F2F7;
+  --surface:   #FFFFFF;
+  --ink:       #1C1C1E;
+  --ink2:      #3A3A3C;
+  --muted:     #8E8E93;
+  --divider:   #E5E5EA;
+  --income:    #30D158;
+  --expense:   #1C1C1E;
+  --danger:    #FF453A;
+  --accent:    #1C1C1E;
+  --radius-lg: 18px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --tab-h:     72px;
+  --safe-bot:  env(safe-area-inset-bottom, 0px);
+}
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: -apple-system, 'Apple SD Gothic Neo', 'Pretendard', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root { height: 100%; display: flex; flex-direction: column; max-width: 430px; margin: 0 auto; position: relative; }
+
+/* ── 스크롤 영역 ── */
+.screen {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(var(--tab-h) + var(--safe-bot) + 16px);
+  scrollbar-width: none;
+}
+.screen::-webkit-scrollbar { display: none; }
+
+/* ── 탭바 ── */
+.tabbar {
+  position: fixed;
+  bottom: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 100%; max-width: 430px;
+  height: calc(var(--tab-h) + var(--safe-bot));
+  background: rgba(255,255,255,0.94);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid var(--divider);
+  display: flex;
+  z-index: 100;
+  padding-bottom: var(--safe-bot);
+}
+
+.tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 0 4px;
+}
+
+.tab-btn svg { width: 24px; height: 24px; }
+.tab-btn span { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: 0.02em; }
+.tab-btn.active span { color: var(--ink); }
+.tab-btn.active svg path, .tab-btn.active svg rect, .tab-btn.active svg circle { fill: var(--ink); }
+.tab-btn svg path, .tab-btn svg rect, .tab-btn svg circle { fill: var(--muted); }
+
+/* ── 헤더 ── */
+.page-header {
+  padding: 56px 20px 12px;
+  position: sticky; top: 0;
+  background: var(--bg);
+  z-index: 10;
+}
+.page-title { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; color: var(--ink); }
+.page-sub   { font-size: 14px; color: var(--muted); margin-top: 2px; }
+
+/* ── 카드 ── */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  margin: 0 16px 12px;
+}
+
+/* ── 요약 카드 (홈 상단) ── */
+.summary-hero {
+  background: var(--ink);
+  border-radius: var(--radius-lg);
+  margin: 8px 16px 12px;
+  padding: 22px 20px 18px;
+  color: #fff;
+}
+.sh-label { font-size: 12px; color: rgba(255,255,255,.45); font-weight:600; letter-spacing:.05em; text-transform:uppercase; margin-bottom:6px; }
+.sh-balance { font-size: 36px; font-weight: 700; letter-spacing: -1px; }
+.sh-balance .unit { font-size: 18px; font-weight: 500; margin-left: 3px; }
+.sh-row { display: flex; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.12); }
+.sh-col { flex: 1; padding: 0 10px; border-right: 1px solid rgba(255,255,255,.12); }
+.sh-col:first-child { padding-left: 0; }
+.sh-col:last-child  { border-right: none; }
+.sh-col-label { font-size: 11px; color: rgba(255,255,255,.4); margin-bottom: 3px; }
+.sh-col-val   { font-size: 17px; font-weight: 700; color: #fff; }
+.sh-col-val.income  { color: var(--income); }
+.sh-col-val.expense { color: #FF6B6B; }
+
+/* ── 칩 행 ── */
+.chips-row {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px;
+  margin-bottom: 12px;
+}
+.chip {
+  flex: 1;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 11px 6px;
+  text-align: center;
+}
+.chip-label { font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing:.04em; margin-bottom: 4px; }
+.chip-value { font-size: 14px; font-weight: 700; color: var(--ink); }
+
+/* ── 섹션 타이틀 ── */
+.section-title {
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em;
+  padding: 0 20px; margin-bottom: 6px;
+}
+
+/* ── 날짜 그룹 헤더 ── */
+.date-group-hd {
+  display: flex; justify-content: space-between;
+  padding: 10px 20px 4px;
+  font-size: 13px; font-weight: 700; color: var(--muted);
+}
+
+/* ── 거래 아이템 ── */
+.tx-list { margin: 0 16px 8px; background: var(--surface); border-radius: var(--radius-md); overflow: hidden; }
+
+.tx-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 13px 14px;
+  border-top: 1px solid var(--divider);
+  cursor: pointer;
+  transition: background .12s;
+}
+.tx-item:first-child { border-top: none; }
+.tx-item:active { background: var(--bg); }
+
+.tx-left { display: flex; flex-direction: column; gap: 2px; }
+.tx-name { font-size: 15px; font-weight: 600; color: var(--ink); }
+.tx-meta { font-size: 12px; color: var(--muted); }
+.tx-right { text-align: right; flex-shrink: 0; margin-left: 12px; }
+.tx-amount { font-size: 16px; font-weight: 700; }
+.tx-amount.income  { color: var(--income); }
+.tx-amount.expense { color: var(--ink); }
+.tx-method { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+/* ── FAB ── */
+.fab {
+  position: fixed;
+  bottom: calc(var(--tab-h) + var(--safe-bot) + 16px);
+  right: calc(50% - 210px + 16px);
+  width: 54px; height: 54px;
+  background: var(--ink);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; color: #fff; font-weight: 300;
+  box-shadow: 0 4px 20px rgba(0,0,0,.28);
+  cursor: pointer;
+  border: none;
+  z-index: 90;
+  transition: transform .15s;
+  line-height: 1;
+}
+.fab:active { transform: scale(.93); }
+
+/* ── 모달 오버레이 ── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 200;
+  display: flex; align-items: flex-end;
+  padding-bottom: var(--safe-bot);
+}
+.modal-sheet {
+  width: 100%; max-width: 430px;
+  margin: 0 auto;
+  background: var(--surface);
+  border-radius: 24px 24px 0 0;
+  padding: 0 20px 24px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal-handle {
+  width: 36px; height: 4px;
+  background: var(--divider);
+  border-radius: 2px;
+  margin: 12px auto 20px;
+}
+.modal-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+
+/* ── 입력 필드 ── */
+.input-field {
+  width: 100%;
+  background: var(--bg);
+  border: none; outline: none;
+  border-radius: var(--radius-sm);
+  padding: 13px 14px;
+  font-size: 15px;
+  color: var(--ink);
+  font-family: inherit;
+  resize: none;
+}
+.input-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing:.05em; margin-bottom: 6px; }
+.input-hint  { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+
+/* ── 파싱 결과 카드 ── */
+.parse-card {
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin: 12px 0;
+}
+.parse-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--divider);
+}
+.parse-row:last-child { border-bottom: none; }
+.parse-key { font-size: 12px; color: var(--muted); }
+.parse-val { font-size: 13px; font-weight: 600; color: var(--ink); }
+
+/* ── 버튼 ── */
+.btn-row { display: flex; gap: 8px; margin-top: 12px; }
+.btn {
+  flex: 1; padding: 14px;
+  border-radius: var(--radius-sm);
+  font-size: 15px; font-weight: 700;
+  border: none; cursor: pointer;
+  font-family: inherit;
+  transition: opacity .12s;
+}
+.btn:active { opacity: .75; }
+.btn-primary   { background: var(--ink); color: #fff; }
+.btn-secondary { background: var(--bg);  color: var(--ink); }
+.btn-danger    { background: #FF453A22; color: var(--danger); }
+
+/* ── 수동 입력 폼 ── */
+.form-group { margin-bottom: 14px; }
+.seg-ctrl {
+  display: flex; gap: 6px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+}
+.seg-btn {
+  flex: 1; padding: 8px;
+  border-radius: 8px;
+  border: none; font-size: 14px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+  background: transparent; color: var(--muted);
+  transition: all .15s;
+}
+.seg-btn.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+
+.select-field {
+  width: 100%;
+  background: var(--bg);
+  border: none; outline: none;
+  border-radius: var(--radius-sm);
+  padding: 13px 14px;
+  font-size: 15px; color: var(--ink);
+  font-family: inherit;
+  -webkit-appearance: none;
+}
+
+/* ── 통계 탭 ── */
+.stat-month-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; margin-bottom: 12px;
+}
+.mnav-btn {
+  width: 34px; height: 34px;
+  background: var(--surface);
+  border-radius: 50%;
+  border: none; cursor: pointer;
+  font-size: 18px; color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+}
+.month-label { font-size: 18px; font-weight: 700; }
+
+.bar-chart-wrap { padding: 4px 2px 2px; }
+.bar-row2 { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.bar-cat2 { width: 38px; font-size: 12px; color: var(--muted); text-align: right; flex-shrink: 0; }
+.bar-track2 { flex: 1; height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden; }
+.bar-fill2 { height: 100%; border-radius: 5px; background: var(--ink); transition: width .4s ease; }
+.bar-val2  { width: 64px; font-size: 11px; font-weight: 700; color: var(--ink); text-align: right; flex-shrink: 0; }
+
+.donut-row { display: flex; gap: 10px; padding: 0 16px; margin-bottom: 12px; }
+.donut-card { flex: 1; background: var(--surface); border-radius: var(--radius-md); padding: 14px 12px; }
+.donut-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing:.05em; margin-bottom: 10px; }
+.legend-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.legend-text { font-size: 11px; color: var(--muted); flex: 1; }
+.legend-pct  { font-size: 12px; font-weight: 700; color: var(--ink); }
+
+.top5-item { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-top: 1px solid var(--divider); }
+.top5-item:first-child { border-top: none; }
+.top5-rank  { font-size: 13px; font-weight: 700; color: var(--muted); width: 18px; text-align: center; }
+.top5-name  { font-size: 14px; font-weight: 600; color: var(--ink); flex: 1; }
+.top5-cnt   { font-size: 12px; color: var(--muted); }
+.top5-amt   { font-size: 14px; font-weight: 700; color: var(--ink); }
+
+/* ── 월별 탭 ── */
+.monthly-stats { display: flex; gap: 10px; padding: 0 16px; margin-bottom: 12px; }
+.monthly-stat-card { flex: 1; background: var(--surface); border-radius: var(--radius-md); padding: 14px 12px; text-align: center; }
+.mstat-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing:.04em; margin-bottom: 5px; }
+.mstat-val   { font-size: 14px; font-weight: 700; color: var(--ink); }
+.mstat-val.up   { color: var(--danger); }
+.mstat-val.down { color: var(--income); }
+
+.chart-container { background: var(--surface); border-radius: var(--radius-md); margin: 0 16px 12px; padding: 16px 14px 10px; }
+.chart-bars { display: flex; align-items: flex-end; gap: 6px; height: 100px; border-bottom: 1px solid var(--divider); padding-bottom: 8px; margin-bottom: 6px; }
+.chart-col2 { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; height: 100%; }
+.bar-pair2  { display: flex; gap: 2px; align-items: flex-end; justify-content: center; }
+.bar-in2  { width: 14px; border-radius: 3px 3px 0 0; background: var(--income); opacity: .75; }
+.bar-ex2  { width: 14px; border-radius: 3px 3px 0 0; background: var(--ink); opacity: .8; }
+.chart-mlabel { font-size: 10px; color: var(--muted); font-weight: 600; }
+.chart-legend-row { display: flex; gap: 14px; justify-content: center; margin-top: 6px; }
+.cl-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); font-weight: 600; }
+.cl-dot2 { width: 8px; height: 8px; border-radius: 2px; }
+
+.month-list-card { background: var(--surface); border-radius: var(--radius-md); margin: 0 16px 12px; overflow: hidden; }
+.month-list-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 15px 16px;
+  border-top: 1px solid var(--divider);
+  cursor: pointer;
+  transition: background .12s;
+}
+.month-list-item:first-child { border-top: none; }
+.month-list-item:active { background: var(--bg); }
+.ml-month  { font-size: 16px; font-weight: 700; color: var(--ink); }
+.ml-detail { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.ml-right  { text-align: right; }
+.ml-expense{ font-size: 16px; font-weight: 700; color: var(--ink); }
+.ml-diff   { font-size: 12px; margin-top: 2px; }
+.ml-diff.up   { color: var(--danger); }
+.ml-diff.down { color: var(--income); }
+
+/* ── 월별 상세 뷰 ── */
+.back-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: none; border: none;
+  font-size: 16px; font-weight: 600; color: var(--ink);
+  cursor: pointer; padding: 0;
+}
+
+/* ── 설정 탭 ── */
+.settings-group { margin: 0 16px 16px; }
+.settings-group-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing:.06em; padding: 0 4px; margin-bottom: 6px; }
+.settings-list { background: var(--surface); border-radius: var(--radius-md); overflow: hidden; }
+.settings-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 16px; border-top: 1px solid var(--divider); cursor: pointer; }
+.settings-item:first-child { border-top: none; }
+.settings-item:active { background: var(--bg); }
+.settings-label { font-size: 15px; color: var(--ink); font-weight: 500; }
+.settings-value { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+
+/* ── 토글 ── */
+.toggle-wrap { display: flex; align-items: center; }
+.toggle-sw {
+  width: 48px; height: 28px;
+  border-radius: 14px;
+  background: var(--divider);
+  position: relative;
+  cursor: pointer;
+  transition: background .2s;
+  border: none;
+  flex-shrink: 0;
+}
+.toggle-sw.on { background: #34C759; }
+.toggle-sw::after {
+  content: ''; width: 24px; height: 24px;
+  background: #fff; border-radius: 50%;
+  position: absolute; top: 2px; left: 2px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+  transition: left .2s;
+}
+.toggle-sw.on::after { left: 22px; }
+
+/* ── 예산 진행바 ── */
+.budget-item { padding: 12px 16px; border-top: 1px solid var(--divider); }
+.budget-item:first-child { border-top: none; }
+.budget-top { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.budget-name { font-size: 14px; font-weight: 600; color: var(--ink); }
+.budget-nums { font-size: 12px; color: var(--muted); }
+.budget-track { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.budget-fill { height: 100%; border-radius: 3px; background: var(--ink); transition: width .4s; }
+.budget-fill.over { background: var(--danger); }
+
+/* ── 빈 상태 ── */
+.empty-state { padding: 48px 20px; text-align: center; color: var(--muted); }
+.empty-state p { font-size: 15px; line-height: 1.6; }
+
+/* ── 필터 바 ── */
+.filter-bar { display: flex; gap: 8px; padding: 0 16px; margin-bottom: 12px; overflow-x: auto; scrollbar-width: none; }
+.filter-bar::-webkit-scrollbar { display: none; }
+.filter-pill {
+  padding: 7px 16px; border-radius: 20px;
+  font-size: 13px; font-weight: 600; white-space: nowrap;
+  background: var(--surface); color: var(--muted);
+  border: none; cursor: pointer; font-family: inherit;
+  transition: all .15s;
+}
+.filter-pill.active { background: var(--ink); color: #fff; }
+
+/* ── 로딩 스피너 ── */
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--divider);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  margin: 0 auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── 토스트 ── */
+.toast {
+  position: fixed;
+  bottom: calc(var(--tab-h) + var(--safe-bot) + 80px);
+  left: 50%; transform: translateX(-50%);
+  background: var(--ink2);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 24px;
+  font-size: 14px; font-weight: 600;
+  z-index: 300;
+  animation: fadeUp .25s ease;
+  white-space: nowrap;
+}
+@keyframes fadeUp { from { opacity:0; transform: translate(-50%, 10px); } to { opacity:1; transform: translate(-50%, 0); } }
+
+/* ── 검색창 ── */
+.search-bar {
+  margin: 0 16px 12px;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center;
+  padding: 10px 14px; gap: 8px;
+}
+.search-bar input {
+  flex: 1; border: none; outline: none;
+  font-size: 15px; color: var(--ink);
+  background: transparent; font-family: inherit;
+}
+.search-bar input::placeholder { color: var(--muted); }
+
+/* 스와이프 삭제 힌트 */
+.tx-item-wrap { position: relative; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
+/* ══════════════════════════════════════════════
+   상수 & 유틸
+══════════════════════════════════════════════ */
+const STORAGE_KEY = 'ai_budget_v1';
+const SETTINGS_KEY = 'ai_budget_settings_v1';
+
+// 카테고리 목록 (아이콘 없음)
+const CATEGORIES_EXPENSE = ['식비','카페','교통','생활','쇼핑','의료','교육','주거','여가','업무비','기타'];
+const CATEGORIES_INCOME  = ['급여','용돈/송금','부수입','기타수입'];
+const PAYMENT_METHODS    = ['카드','현금','계좌이체','기타'];
+const SUBJECTS           = ['개인','생활비','업무'];
+
+// 숫자 → 한국식 포맷
+function fmt(n) {
+  if (n === undefined || n === null || isNaN(n)) return '0';
+  return Math.abs(Math.round(n)).toLocaleString('ko-KR');
+}
+
+// 날짜 → "6월 3일 월요일"
+function fmtDateFull(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const days = ['일','월','화','수','목','금','토'];
+  return `${d.getMonth()+1}월 ${d.getDate()}일 ${days[d.getDay()]}요일`;
+}
+
+// 날짜 → "2025. 6. 3."
+function fmtDateShort(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return `${d.getFullYear()}. ${d.getMonth()+1}. ${d.getDate()}.`;
+}
+
+// YYYY-MM → "2025년 6월"
+function fmtYM(ym) {
+  const [y, m] = ym.split('-');
+  return `${y}년 ${parseInt(m)}월`;
+}
+
+// 오늘 날짜 YYYY-MM-DD
+function today() {
+  return new Date().toISOString().slice(0,10);
+}
+
+// 이번달 YYYY-MM
+function thisMonth() {
+  return today().slice(0,7);
+}
+
+// 거래 ID 생성
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+}
+
+/* ══════════════════════════════════════════════
+   LocalStorage
+══════════════════════════════════════════════ */
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveData(txs) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(txs)); } catch {}
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    return raw ? JSON.parse(raw) : {
+      budgetAlert: true,
+      monthReport: false,
+      totalBudget: 3000000,
+      catBudgets: { '식비': 600000, '교통': 700000 },
+      customCategories: []
+    };
+  } catch {
+    return { budgetAlert: true, monthReport: false, totalBudget: 3000000, catBudgets: {}, customCategories: [] };
+  }
+}
+
+function saveSettings(s) {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch {}
+}
+
+/* ══════════════════════════════════════════════
+   정규식 기반 로컬 파서 (API 불필요)
+══════════════════════════════════════════════ */
+
+// 카테고리 키워드 매핑
+const CAT_KEYWORDS = {
+  '카페':  ['카페','커피','스타벅스','이디야','빽다방','투썸','아메리카노','라떼','블렌더','할리스','폴바셋','커피빈'],
+  '식비':  ['식당','밥','점심','저녁','아침','식사','분식','김밥','치킨','피자','햄버거','맥도날드','버거킹','롯데리아','도미노','bbq','굽네','교촌','한식','중식','일식','양식','국밥','냉면','갈비','삼겹','곱창','족발','보쌈','순대','떡볶이','라면','우동','파스타','스테이크','초밥','회','쌈밥','비빔밥','순두부','설렁탕','해장국','식보','백반','구내식당','뷔페','레스토랑','음식'],
+  '교통':  ['주유','기름','주유소','gs칼텍스','sk에너지','현대오일','에쓰오일','버스','지하철','택시','카카오택시','우버','ktx','기차','고속버스','항공','비행기','주차','톨비','하이패스','자동차','정비','세차','카셰어링','쏘카','그린카'],
+  '생활':  ['마트','이마트','홈플러스','롯데마트','코스트코','편의점','gs25','cu','세븐일레븐','미니스톱','이마트24','다이소','올리브영','드럭스토어','약국','생필품','생활용품','청소','세제','휴지','비누','샴푸','린스','치약','칫솔','화장품'],
+  '쇼핑':  ['쇼핑','의류','옷','신발','가방','패션','무신사','쿠팡','11번가','g마켓','옥션','위메프','티몬','배달의민족','배민','요기요','쿠팡이츠','인터넷쇼핑','온라인','아마존','알리','테무'],
+  '의료':  ['병원','의원','한의원','치과','안과','내과','외과','피부과','정형외과','이비인후과','산부인과','소아과','약','약국','처방','진료','검사','수술','입원','주사','의료'],
+  '교육':  ['학원','과외','교육','수업','강의','책','교재','문제집','학습','인강','유튜브프리미엄','넷플릭스','왓챠','독서','도서','도서관','학교','대학','등록금','수강'],
+  '주거':  ['월세','전세','관리비','전기','가스','수도','인터넷','통신','핸드폰','휴대폰','kt','sk','lg','알뜰폰','아이폰','갤럭시','수리','인테리어','가구','가전'],
+  '여가':  ['영화','cgv','롯데시네마','메가박스','공연','연극','뮤지컬','콘서트','노래방','pc방','게임','여행','숙박','호텔','펜션','에어비앤비','레저','스포츠','헬스','요가','골프','등산','낚시','캠핑','공원'],
+  '업무비':['업무','출장','접대','회식','사무','문구','복사','인쇄','택배','배송','우편'],
+};
+
+// 수입 키워드
+const INCOME_KEYWORDS = ['급여','월급','보너스','상여','용돈','송금','환급','환불','수당','알바','부수입','이자','배당','임대','연금'];
+
+// 결제수단 키워드
+const METHOD_MAP = {
+  '카드': ['카드','삼성카드','신한카드','현대카드','롯데카드','kb카드','우리카드','하나카드','bc카드','농협카드','씨티카드','sc카드','카카오페이','네이버페이','페이코','ssg페이','토스','제로페이'],
+  '현금': ['현금'],
+  '계좌이체': ['이체','계좌이체','무통장','송금','이체'],
+};
+
+// 한국어 숫자 변환 (오천, 만, 만오천 등)
+function parseKoreanAmount(text) {
+  // 순수 숫자+원 패턴 먼저 (12000원, 12,000원)
+  let m = text.match(/(\d[\d,]+)\s*원/);
+  if (m) return parseInt(m[1].replace(/,/g, ''));
+
+  // 숫자+만/천 단위 (1만2천, 3만5천원, 5천원, 12만원)
+  m = text.match(/(\d+)\s*만\s*(\d+)?\s*천?/);
+  if (m) {
+    const man = parseInt(m[1]) * 10000;
+    const chun = m[2] ? parseInt(m[2]) * 1000 : 0;
+    return man + chun;
+  }
+  m = text.match(/(\d+)\s*만/);
+  if (m) return parseInt(m[1]) * 10000;
+
+  m = text.match(/(\d+)\s*천/);
+  if (m) return parseInt(m[1]) * 1000;
+
+  // 숫자만 (공백 구분된 토큰에서)
+  m = text.match(/\b(\d{3,})\b/);
+  if (m) return parseInt(m[1]);
+
+  return null;
+}
+
+// 날짜 파싱
+function parseDate(text) {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm   = String(now.getMonth()+1).padStart(2,'0');
+  const dd   = String(now.getDate()).padStart(2,'0');
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+
+  if (/오늘/.test(text)) return todayStr;
+  if (/어제/.test(text)) {
+    const y = new Date(now - 86400000);
+    return `${y.getFullYear()}-${String(y.getMonth()+1).padStart(2,'0')}-${String(y.getDate()).padStart(2,'0')}`;
+  }
+  if (/그제|그저께/.test(text)) {
+    const y = new Date(now - 172800000);
+    return `${y.getFullYear()}-${String(y.getMonth()+1).padStart(2,'0')}-${String(y.getDate()).padStart(2,'0')}`;
+  }
+
+  // M/D or M.D or M월D일
+  let m = text.match(/(\d{1,2})[\/\.](\d{1,2})/);
+  if (!m) m = text.match(/(\d{1,2})월\s*(\d{1,2})일?/);
+  if (m) {
+    const mo = String(parseInt(m[1])).padStart(2,'0');
+    const dy = String(parseInt(m[2])).padStart(2,'0');
+    return `${yyyy}-${mo}-${dy}`;
+  }
+
+  // YYYY-MM-DD
+  m = text.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[0];
+
+  return todayStr; // 날짜 없으면 오늘
+}
+
+// 카테고리 추론
+function guessCategory(text, isIncome) {
+  const t = text.toLowerCase();
+  if (isIncome) {
+    for (const kw of INCOME_KEYWORDS) if (t.includes(kw)) return kw === '급여' || kw === '월급' ? '급여' : kw === '용돈' || kw === '송금' ? '용돈/송금' : '부수입';
+    return '기타수입';
+  }
+  for (const [cat, kws] of Object.entries(CAT_KEYWORDS)) {
+    for (const kw of kws) if (t.includes(kw)) return cat;
+  }
+  return '기타';
+}
+
+// 결제수단 추론
+function guessMethod(text) {
+  const t = text.toLowerCase();
+  for (const [method, kws] of Object.entries(METHOD_MAP)) {
+    for (const kw of kws) if (t.includes(kw)) return method;
+  }
+  return '카드'; // 기본값
+}
+
+// 주체 추론
+function guessSubject(text) {
+  if (/생활비|생활/.test(text)) return '생활비';
+  if (/업무|회사|법인|출장|접대/.test(text)) return '업무';
+  return '개인';
+}
+
+// 수입 여부
+function isIncomeText(text) {
+  const t = text.toLowerCase();
+  return INCOME_KEYWORDS.some(kw => t.includes(kw));
+}
+
+// 비용처 추출: 알려진 키워드 제거 후 남은 의미있는 단어
+function guessPlace(text) {
+  let t = text;
+  // 날짜 제거
+  t = t.replace(/\d{1,2}[\/\.]\d{1,2}/, '');
+  t = t.replace(/\d{1,2}월\s*\d{1,2}일?/, '');
+  t = t.replace(/오늘|어제|그제|그저께/, '');
+  // 금액 제거
+  t = t.replace(/\d[\d,]*\s*원/, '');
+  t = t.replace(/\d+\s*만\s*\d*\s*천?/, '');
+  t = t.replace(/\d+\s*만/, '');
+  t = t.replace(/\d+\s*천/, '');
+  t = t.replace(/\b\d{3,}\b/, '');
+  // 결제수단 키워드 제거
+  for (const kws of Object.values(METHOD_MAP)) for (const kw of kws) t = t.replace(new RegExp(kw, 'gi'), '');
+  // 주체 키워드 제거
+  t = t.replace(/개인|생활비|생활|업무/, '');
+  // 구분자 및 공백 정리
+  t = t.replace(/[,·\-\/\.]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // 남은 첫 번째 의미있는 단어 반환
+  const tokens = t.split(' ').filter(w => w.length >= 1);
+  return tokens.length > 0 ? tokens.join(' ') : '';
+}
+
+// 메인 파서
+function parseWithAI(text) {
+  // 동기 함수를 Promise로 래핑 (기존 async 호출 구조 유지)
+  return new Promise((resolve, reject) => {
+    try {
+      const isIncome = isIncomeText(text);
+      const date     = parseDate(text);
+      const amount   = parseKoreanAmount(text);
+      const method   = guessMethod(text);
+      const subject  = guessSubject(text);
+      const category = guessCategory(text, isIncome);
+      const place    = guessPlace(text);
+
+      if (!amount || amount <= 0) {
+        reject(new Error('금액을 인식하지 못했습니다'));
+        return;
+      }
+
+      resolve({
+        date,
+        type:     isIncome ? 'income' : 'expense',
+        amount,
+        method,
+        category,
+        place:    place || category,
+        subject,
+        memo:     ''
+      });
+    } catch(e) {
+      reject(e);
+    }
+  });
+}
+
+/* ══════════════════════════════════════════════
+   SVG 아이콘
+══════════════════════════════════════════════ */
+const Icons = {
+  Home: () => (
+    <svg viewBox="0 0 24 24" fill="none">
+      <path d="M3 9.5L12 3l9 6.5V21a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" fill="currentColor" opacity=".85"/>
+      <rect x="9" y="13" width="6" height="9" rx="1" fill="white" opacity=".9"/>
+    </svg>
+  ),
+  List: () => (
+    <svg viewBox="0 0 24 24">
+      <rect x="3" y="5" width="18" height="2" rx="1" fill="currentColor"/>
+      <rect x="3" y="11" width="18" height="2" rx="1" fill="currentColor"/>
+      <rect x="3" y="17" width="14" height="2" rx="1" fill="currentColor"/>
+    </svg>
+  ),
+  Chart: () => (
+    <svg viewBox="0 0 24 24">
+      <rect x="3" y="12" width="4" height="9" rx="1" fill="currentColor" opacity=".5"/>
+      <rect x="10" y="7" width="4" height="14" rx="1" fill="currentColor" opacity=".75"/>
+      <rect x="17" y="3" width="4" height="18" rx="1" fill="currentColor"/>
+    </svg>
+  ),
+  Calendar: () => (
+    <svg viewBox="0 0 24 24">
+      <rect x="3" y="5" width="18" height="16" rx="2" fill="currentColor" opacity=".2"/>
+      <path d="M3 9h18" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+      <rect x="8" y="2" width="2" height="6" rx="1" fill="currentColor"/>
+      <rect x="14" y="2" width="2" height="6" rx="1" fill="currentColor"/>
+      <rect x="7" y="12" width="3" height="3" rx=".5" fill="currentColor"/>
+      <rect x="12" y="12" width="3" height="3" rx=".5" fill="currentColor"/>
+    </svg>
+  ),
+  Settings: () => (
+    <svg viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="3" fill="currentColor"/>
+      <path d="M12 2a1 1 0 011 1v2a7 7 0 014.95 2.05l1.41-1.41a1 1 0 011.42 1.42l-1.41 1.41A7 7 0 0121 12h2a1 1 0 010 2h-2a7 7 0 01-2.05 4.95l1.41 1.41a1 1 0 01-1.42 1.42l-1.41-1.41A7 7 0 0112 22v2a1 1 0 01-2 0v-2a7 7 0 01-4.95-2.05l-1.41 1.41a1 1 0 01-1.42-1.42l1.41-1.41A7 7 0 013 14H1a1 1 0 010-2h2a7 7 0 012.05-4.95L3.64 5.64a1 1 0 011.42-1.42l1.41 1.41A7 7 0 0112 3V1a1 1 0 011 1z" fill="currentColor" opacity=".5"/>
+    </svg>
+  ),
+  Back: () => (
+    <svg viewBox="0 0 24 24" width="20" height="20">
+      <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+    </svg>
+  ),
+  Search: () => (
+    <svg viewBox="0 0 24 24" width="18" height="18">
+      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" fill="none"/>
+      <path d="M16.5 16.5l4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/>
+    </svg>
+  ),
+  Chevron: () => (
+    <svg viewBox="0 0 24 24" width="16" height="16">
+      <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/>
+    </svg>
+  )
+};
+
+/* ══════════════════════════════════════════════
+   하위 컴포넌트: 거래 아이템
+══════════════════════════════════════════════ */
+function TxItem({ tx, onClick }) {
+  const isIncome = tx.type === 'income';
+  return (
+    <div className="tx-item" onClick={() => onClick && onClick(tx)}>
+      <div className="tx-left">
+        <div className="tx-name">{tx.place || tx.category}</div>
+        <div className="tx-meta">{tx.category}{tx.subject ? ` · ${tx.subject}` : ''}</div>
+      </div>
+      <div className="tx-right">
+        <div className={`tx-amount ${isIncome ? 'income' : 'expense'}`}>
+          {isIncome ? '+' : '−'}{fmt(tx.amount)}원
+        </div>
+        <div className="tx-method">{tx.method}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   하위 컴포넌트: 날짜별 그룹 렌더
+══════════════════════════════════════════════ */
+function TxGrouped({ txList, onTxClick }) {
+  // 날짜별 그룹화
+  const grouped = useMemo(() => {
+    const map = {};
+    txList.forEach(tx => {
+      if (!map[tx.date]) map[tx.date] = [];
+      map[tx.date].push(tx);
+    });
+    // 날짜 내림차순, 각 날짜 내에서도 id 내림차순
+    return Object.entries(map)
+      .sort(([a],[b]) => b.localeCompare(a))
+      .map(([date, items]) => ({
+        date,
+        items: [...items].sort((a,b) => b.id.localeCompare(a.id)),
+        total: items.reduce((s, t) => t.type === 'expense' ? s - t.amount : s + t.amount, 0)
+      }));
+  }, [txList]);
+
+  if (!txList.length) {
+    return (
+      <div className="empty-state">
+        <p>내역이 없습니다.<br/>+ 버튼으로 첫 내역을 입력해보세요.</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {grouped.map(g => (
+        <div key={g.date}>
+          <div className="date-group-hd">
+            <span>{fmtDateFull(g.date)}</span>
+            <span style={{color: g.total >= 0 ? '#30D158' : 'inherit'}}>
+              {g.total >= 0 ? '+' : '−'}{fmt(Math.abs(g.total))}원
+            </span>
+          </div>
+          <div className="tx-list">
+            {g.items.map(tx => (
+              <TxItem key={tx.id} tx={tx} onClick={onTxClick} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   모달: 거래 입력
+══════════════════════════════════════════════ */
+function InputModal({ onClose, onSave, editTx }) {
+  const [mode, setMode] = useState('text'); // 'text' | 'form'
+  const [inputText, setInputText] = useState('');
+  const [parsing, setParsing] = useState(false);
+  const [parsed, setParsed] = useState(null);
+  const [parseError, setParseError] = useState('');
+
+  // 폼 직접 입력 상태
+  const [form, setForm] = useState(editTx || {
+    type: 'expense', date: today(), amount: '', method: '카드',
+    category: '식비', place: '', subject: '개인', memo: ''
+  });
+
+  // 수정 모드면 바로 폼으로
+  useEffect(() => { if (editTx) setMode('form'); }, [editTx]);
+
+  // 자동 파싱 (로컬 정규식 기반)
+  async function handleParse() {
+    if (!inputText.trim()) return;
+    setParsing(true); setParseError('');
+    try {
+      const result = await parseWithAI(inputText.trim());
+      setParsed(result);
+    } catch (e) {
+      setParseError('금액을 찾지 못했습니다. 금액(예: 12000원)을 포함해 다시 입력해 주세요.');
+    } finally {
+      setParsing(false);
+    }
+  }
+
+  function handleSaveParsed() {
+    if (!parsed) return;
+    const tx = { ...parsed, id: editTx?.id || genId() };
+    onSave(tx);
+  }
+
+  function handleSaveForm() {
+    if (!form.amount || !form.date) return;
+    const tx = { ...form, amount: Number(String(form.amount).replace(/,/g,'')), id: editTx?.id || genId() };
+    onSave(tx);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-sheet">
+        <div className="modal-handle"></div>
+        <div className="modal-title">{editTx ? '내역 수정' : '내역 입력'}</div>
+
+        {/* 모드 전환 */}
+        {!editTx && (
+          <div className="form-group">
+            <div className="seg-ctrl">
+              <button className={`seg-btn ${mode==='text'?'active':''}`} onClick={()=>{setMode('text');setParsed(null);}}>자동 인식</button>
+              <button className={`seg-btn ${mode==='form'?'active':''}`} onClick={()=>setMode('form')}>직접 입력</button>
+            </div>
+          </div>
+        )}
+
+        {/* AI 텍스트 입력 */}
+        {mode === 'text' && (
+          <>
+            <div className="form-group">
+              <div className="input-label">자유롭게 입력</div>
+              <textarea
+                className="input-field"
+                rows={3}
+                placeholder="예) 4/3 삼성카드 24000원 점심 가온식당 개인"
+                value={inputText}
+                onChange={e => { setInputText(e.target.value); setParsed(null); }}
+              />
+              <div className="input-hint">
+                날짜 · 결제수단 · 금액 · 비용처 · 주체를 자유로운 순서로 입력하세요.<br/>
+                예) 6/13 삼성카드 12000원 다이소 개인<br/>
+                예) 어제 현금 5천 편의점 생활비<br/>
+                ※ 금액은 반드시 포함해야 합니다.
+              </div>
+            </div>
+
+            {parseError && <div style={{color:'var(--danger)',fontSize:13,marginBottom:8}}>{parseError}</div>}
+
+            {parsing && <div style={{padding:'16px 0'}}><div className="spinner"></div></div>}
+
+            {/* 파싱 결과 */}
+            {parsed && !parsing && (
+              <>
+                <div className="parse-card">
+                  <div className="parse-row"><span className="parse-key">날짜</span><span className="parse-val">{fmtDateShort(parsed.date)}</span></div>
+                  <div className="parse-row"><span className="parse-key">구분</span><span className="parse-val">{parsed.type === 'income' ? '수입' : '지출'}</span></div>
+                  <div className="parse-row"><span className="parse-key">금액</span><span className="parse-val">{fmt(parsed.amount)}원</span></div>
+                  <div className="parse-row"><span className="parse-key">결제수단</span><span className="parse-val">{parsed.method}</span></div>
+                  <div className="parse-row"><span className="parse-key">카테고리</span><span className="parse-val">{parsed.category}</span></div>
+                  <div className="parse-row"><span className="parse-key">비용처</span><span className="parse-val">{parsed.place}</span></div>
+                  <div className="parse-row"><span className="parse-key">주체</span><span className="parse-val">{parsed.subject}</span></div>
+                  {parsed.memo && <div className="parse-row"><span className="parse-key">메모</span><span className="parse-val">{parsed.memo}</span></div>}
+                </div>
+                <div className="btn-row">
+                  <button className="btn btn-secondary" onClick={() => { setParsed(null); }}>다시 입력</button>
+                  <button className="btn btn-primary" onClick={handleSaveParsed}>저장</button>
+                </div>
+              </>
+            )}
+
+            {!parsed && !parsing && (
+              <div className="btn-row">
+                <button className="btn btn-secondary" onClick={onClose}>취소</button>
+                <button className="btn btn-primary" onClick={handleParse} disabled={!inputText.trim()}>분석</button>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* 직접 입력 폼 */}
+        {mode === 'form' && (
+          <>
+            <div className="form-group">
+              <div className="seg-ctrl">
+                <button className={`seg-btn ${form.type==='expense'?'active':''}`} onClick={()=>setForm(f=>({...f,type:'expense',category:'식비'}))}>지출</button>
+                <button className={`seg-btn ${form.type==='income'?'active':''}`} onClick={()=>setForm(f=>({...f,type:'income',category:'급여'}))}>수입</button>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <div className="input-label">날짜</div>
+              <input type="date" className="input-field" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} />
+            </div>
+
+            <div className="form-group">
+              <div className="input-label">금액 (원)</div>
+              <input type="number" className="input-field" placeholder="0" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} inputMode="numeric" />
+            </div>
+
+            <div className="form-group">
+              <div className="input-label">결제수단</div>
+              <select className="select-field" value={form.method} onChange={e=>setForm(f=>({...f,method:e.target.value}))}>
+                {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <div className="input-label">카테고리</div>
+              <select className="select-field" value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>
+                {(form.type==='expense' ? CATEGORIES_EXPENSE : CATEGORIES_INCOME).map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <div className="input-label">비용처 / 내용</div>
+              <input type="text" className="input-field" placeholder="예) 가온식당, 이마트, 급여" value={form.place} onChange={e=>setForm(f=>({...f,place:e.target.value}))} />
+            </div>
+
+            <div className="form-group">
+              <div className="input-label">주체</div>
+              <div className="seg-ctrl">
+                {SUBJECTS.map(s => (
+                  <button key={s} className={`seg-btn ${form.subject===s?'active':''}`} onClick={()=>setForm(f=>({...f,subject:s}))}>{s}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <div className="input-label">메모 (선택)</div>
+              <input type="text" className="input-field" placeholder="추가 메모" value={form.memo||''} onChange={e=>setForm(f=>({...f,memo:e.target.value}))} />
+            </div>
+
+            <div className="btn-row">
+              <button className="btn btn-secondary" onClick={onClose}>취소</button>
+              <button className="btn btn-primary" onClick={handleSaveForm} disabled={!form.amount || !form.date}>저장</button>
+            </div>
+          </>
+        )}
+
+        <div style={{height:8}}/>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   모달: 거래 상세/수정/삭제
+══════════════════════════════════════════════ */
+function TxDetailModal({ tx, onClose, onEdit, onDelete }) {
+  const isIncome = tx.type === 'income';
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-sheet">
+        <div className="modal-handle"></div>
+        <div className="modal-title">{tx.place || tx.category}</div>
+        <div className="parse-card">
+          <div className="parse-row"><span className="parse-key">날짜</span><span className="parse-val">{fmtDateShort(tx.date)}</span></div>
+          <div className="parse-row"><span className="parse-key">구분</span><span className="parse-val">{isIncome ? '수입' : '지출'}</span></div>
+          <div className="parse-row"><span className="parse-key">금액</span>
+            <span className="parse-val" style={{color: isIncome ? 'var(--income)' : 'inherit'}}>
+              {isIncome ? '+' : '−'}{fmt(tx.amount)}원
+            </span>
+          </div>
+          <div className="parse-row"><span className="parse-key">결제수단</span><span className="parse-val">{tx.method}</span></div>
+          <div className="parse-row"><span className="parse-key">카테고리</span><span className="parse-val">{tx.category}</span></div>
+          <div className="parse-row"><span className="parse-key">비용처</span><span className="parse-val">{tx.place || '-'}</span></div>
+          <div className="parse-row"><span className="parse-key">주체</span><span className="parse-val">{tx.subject || '-'}</span></div>
+          {tx.memo && <div className="parse-row"><span className="parse-key">메모</span><span className="parse-val">{tx.memo}</span></div>}
+        </div>
+        <div className="btn-row">
+          <button className="btn btn-danger" onClick={() => onDelete(tx.id)}>삭제</button>
+          <button className="btn btn-secondary" onClick={onClose}>닫기</button>
+          <button className="btn btn-primary" onClick={() => onEdit(tx)}>수정</button>
+        </div>
+        <div style={{height:8}}/>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   TAB 1: 홈 (이번 달)
+══════════════════════════════════════════════ */
+function TabHome({ txList, onTxClick }) {
+  const ym = thisMonth();
+
+  // 이번 달 거래
+  const monthTxs = useMemo(() =>
+    txList.filter(t => t.date.startsWith(ym)),
+    [txList, ym]
+  );
+
+  const income  = useMemo(() => monthTxs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0), [monthTxs]);
+  const expense = useMemo(() => monthTxs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0), [monthTxs]);
+  const balance = income - expense;
+
+  // 주체별
+  const bySubject = useMemo(() => {
+    const r = {};
+    SUBJECTS.forEach(s => r[s] = monthTxs.filter(t=>t.type==='expense'&&t.subject===s).reduce((a,t)=>a+t.amount,0));
+    return r;
+  }, [monthTxs]);
+
+  // 결제수단별
+  const byMethod = useMemo(() => {
+    const r = {};
+    PAYMENT_METHODS.forEach(m => r[m] = monthTxs.filter(t=>t.type==='expense'&&t.method===m).reduce((a,t)=>a+t.amount,0));
+    return r;
+  }, [monthTxs]);
+
+  return (
+    <div className="screen">
+      <div className="page-header">
+        <div className="page-title">가계부</div>
+        <div className="page-sub">{fmtYM(ym)}</div>
+      </div>
+
+      {/* 잔액 히어로 카드 */}
+      <div className="summary-hero">
+        <div className="sh-label">이번 달 잔액</div>
+        <div className="sh-balance">
+          {balance >= 0 ? '+' : '−'}{fmt(Math.abs(balance))}<span className="unit">원</span>
+        </div>
+        <div className="sh-row">
+          <div className="sh-col">
+            <div className="sh-col-label">수입</div>
+            <div className="sh-col-val income">{fmt(income)}</div>
+          </div>
+          <div className="sh-col">
+            <div className="sh-col-label">지출</div>
+            <div className="sh-col-val expense">{fmt(expense)}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* 주체별 */}
+      <div className="chips-row">
+        {SUBJECTS.map(s => (
+          <div key={s} className="chip">
+            <div className="chip-label">{s}</div>
+            <div className="chip-value">{fmt(bySubject[s])}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* 결제수단별 */}
+      <div className="chips-row">
+        {PAYMENT_METHODS.filter(m=>m!=='기타').map(m => (
+          <div key={m} className="chip">
+            <div className="chip-label">{m}</div>
+            <div className="chip-value">{fmt(byMethod[m])}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* 이번 달 전체 내역 */}
+      <div className="section-title" style={{marginTop:4}}>이번 달 내역</div>
+      <TxGrouped txList={monthTxs} onTxClick={onTxClick} />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   TAB 2: 내역
+══════════════════════════════════════════════ */
+function TabList({ txList, onTxClick }) {
+  const [filter, setFilter] = useState('전체');
+  const [search, setSearch] = useState('');
+  const filters = ['전체','지출','수입','개인','생활비','업무'];
+
+  const filtered = useMemo(() => {
+    let list = [...txList];
+    if (filter === '지출') list = list.filter(t=>t.type==='expense');
+    else if (filter === '수입') list = list.filter(t=>t.type==='income');
+    else if (SUBJECTS.includes(filter)) list = list.filter(t=>t.subject===filter);
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(t =>
+        (t.place||'').toLowerCase().includes(q) ||
+        (t.category||'').toLowerCase().includes(q) ||
+        (t.memo||'').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [txList, filter, search]);
+
+  return (
+    <div className="screen">
+      <div className="page-header">
+        <div className="page-title">내역</div>
+      </div>
+
+      {/* 검색 */}
+      <div className="search-bar">
+        <Icons.Search/>
+        <input placeholder="비용처, 카테고리 검색" value={search} onChange={e=>setSearch(e.target.value)}/>
+        {search && <span style={{color:'var(--muted)',cursor:'pointer',fontSize:16}} onClick={()=>setSearch('')}>✕</span>}
+      </div>
+
+      {/* 필터 */}
+      <div className="filter-bar">
+        {filters.map(f => (
+          <button key={f} className={`filter-pill ${filter===f?'active':''}`} onClick={()=>setFilter(f)}>{f}</button>
+        ))}
+      </div>
+
+      <TxGrouped txList={filtered} onTxClick={onTxClick} />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   TAB 3: 통계
+══════════════════════════════════════════════ */
+function TabStats({ txList }) {
+  const [ym, setYm] = useState(thisMonth());
+
+  function prevMonth() {
+    const [y,m] = ym.split('-').map(Number);
+    setYm(m===1 ? `${y-1}-12` : `${y}-${String(m-1).padStart(2,'0')}`);
+  }
+  function nextMonth() {
+    const [y,m] = ym.split('-').map(Number);
+    const n = m===12 ? `${y+1}-01` : `${y}-${String(m+1).padStart(2,'0')}`;
+    if (n <= thisMonth()) setYm(n);
+  }
+
+  const mTxs = useMemo(() => txList.filter(t=>t.date.startsWith(ym)), [txList, ym]);
+  const expTxs = useMemo(() => mTxs.filter(t=>t.type==='expense'), [mTxs]);
+
+  // 카테고리별 지출
+  const byCat = useMemo(() => {
+    const r = {};
+    expTxs.forEach(t => { r[t.category] = (r[t.category]||0) + t.amount; });
+    return Object.entries(r).sort((a,b)=>b[1]-a[1]).slice(0,7);
+  }, [expTxs]);
+
+  const catMax = byCat.length ? byCat[0][1] : 1;
+
+  // 주체별
+  const subjData = useMemo(() => {
+    const total = expTxs.reduce((s,t)=>s+t.amount,0) || 1;
+    return SUBJECTS.map(s => ({
+      name: s,
+      amount: expTxs.filter(t=>t.subject===s).reduce((a,t)=>a+t.amount,0),
+      pct: 0
+    })).map(s => ({...s, pct: Math.round(s.amount/total*100)}));
+  }, [expTxs]);
+
+  // 결제수단별
+  const methodData = useMemo(() => {
+    const total = expTxs.reduce((s,t)=>s+t.amount,0) || 1;
+    return PAYMENT_METHODS.map(m => ({
+      name: m,
+      amount: expTxs.filter(t=>t.method===m).reduce((a,t)=>a+t.amount,0),
+      pct: 0
+    })).filter(m=>m.amount>0).map(m=>({...m, pct:Math.round(m.amount/total*100)}));
+  }, [expTxs]);
+
+  // 자주 가는 곳 TOP5
+  const top5 = useMemo(() => {
+    const r = {};
+    expTxs.forEach(t => {
+      const k = t.place||t.category;
+      if (!r[k]) r[k] = { name:k, count:0, total:0 };
+      r[k].count++; r[k].total += t.amount;
+    });
+    return Object.values(r).sort((a,b)=>b.count-a.count).slice(0,5);
+  }, [expTxs]);
+
+  const DONUT_COLORS = ['#1C1C1E','#8E8E93','#C7C7CC','#D1D1D6'];
+
+  // SVG 도넛 계산
+  function DonutChart({ data, size=80, sw=14 }) {
+    const r = (size-sw)/2;
+    const circ = 2*Math.PI*r;
+    let offset = 0;
+    const slices = data.map((d,i) => {
+      const dash = (d.pct/100)*circ;
+      const gap  = circ - dash;
+      const slice = { dash, gap, offset, color: DONUT_COLORS[i%DONUT_COLORS.length] };
+      offset += dash;
+      return slice;
+    });
+    return (
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{display:'block',margin:'0 auto 8px'}}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--bg)" strokeWidth={sw}/>
+        {slices.map((s,i) => (
+          <circle key={i} cx={size/2} cy={size/2} r={r} fill="none"
+            stroke={s.color} strokeWidth={sw}
+            strokeDasharray={`${s.dash} ${s.gap}`}
+            strokeDashoffset={circ/4 - s.offset}
+            transform={`rotate(-90 ${size/2} ${size/2})`}
+          />
+        ))}
+      </svg>
+    );
+  }
+
+  return (
+    <div className="screen">
+      <div className="page-header">
+        <div className="page-title">통계</div>
+      </div>
+
+      <div className="stat-month-nav">
+        <button className="mnav-btn" onClick={prevMonth}>‹</button>
+        <div className="month-label">{fmtYM(ym)}</div>
+        <button className="mnav-btn" onClick={nextMonth} style={{opacity: ym>=thisMonth()?.slice(0,7)?'.3':'1'}}>›</button>
+      </div>
+
+      {/* 카테고리별 지출 */}
+      <div className="card" style={{padding:'16px 14px'}}>
+        <div className="section-title" style={{padding:0,marginBottom:12}}>카테고리별 지출</div>
+        {byCat.length === 0 ? (
+          <div style={{color:'var(--muted)',fontSize:14,textAlign:'center',padding:'12px 0'}}>데이터 없음</div>
+        ) : (
+          <div className="bar-chart-wrap">
+            {byCat.map(([cat, amt]) => (
+              <div key={cat} className="bar-row2">
+                <div className="bar-cat2">{cat}</div>
+                <div className="bar-track2">
+                  <div className="bar-fill2" style={{width:`${(amt/catMax*100).toFixed(1)}%`}}/>
+                </div>
+                <div className="bar-val2">{fmt(amt)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 도넛 2개 */}
+      <div className="donut-row">
+        <div className="donut-card">
+          <div className="donut-title">주체별</div>
+          <DonutChart data={subjData.filter(s=>s.pct>0)} />
+          {subjData.filter(s=>s.pct>0).map((s,i) => (
+            <div key={s.name} className="legend-row">
+              <div className="legend-dot" style={{background:DONUT_COLORS[i%DONUT_COLORS.length]}}/>
+              <div className="legend-text">{s.name}</div>
+              <div className="legend-pct">{s.pct}%</div>
+            </div>
+          ))}
+          {subjData.filter(s=>s.pct>0).length===0 && <div style={{color:'var(--muted)',fontSize:12,textAlign:'center'}}>데이터 없음</div>}
+        </div>
+
+        <div className="donut-card">
+          <div className="donut-title">결제수단</div>
+          <DonutChart data={methodData} />
+          {methodData.map((m,i) => (
+            <div key={m.name} className="legend-row">
+              <div className="legend-dot" style={{background:DONUT_COLORS[i%DONUT_COLORS.length]}}/>
+              <div className="legend-text">{m.name}</div>
+              <div className="legend-pct">{m.pct}%</div>
+            </div>
+          ))}
+          {methodData.length===0 && <div style={{color:'var(--muted)',fontSize:12,textAlign:'center'}}>데이터 없음</div>}
+        </div>
+      </div>
+
+      {/* TOP 5 */}
+      <div className="card" style={{padding:'16px 14px'}}>
+        <div className="section-title" style={{padding:0,marginBottom:8}}>자주 가는 곳 TOP 5</div>
+        {top5.length === 0
+          ? <div style={{color:'var(--muted)',fontSize:14,textAlign:'center',padding:'12px 0'}}>데이터 없음</div>
+          : top5.map((p,i) => (
+            <div key={p.name} className="top5-item">
+              <div className="top5-rank">{i+1}</div>
+              <div className="top5-name">{p.name}</div>
+              <div className="top5-cnt">{p.count}회</div>
+              <div className="top5-amt">{fmt(p.total)}원</div>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   TAB 4: 월별 + 상세
+══════════════════════════════════════════════ */
+function TabMonthly({ txList, onTxClick }) {
+  const [detail, setDetail] = useState(null); // 선택된 월 YYYY-MM
+
+  // 최근 12개월 목록 생성
+  const months = useMemo(() => {
+    const list = [];
+    const now = new Date();
+    for (let i=0; i<12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+      list.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+    }
+    return list;
+  }, []);
+
+  // 월별 통계
+  const monthStats = useMemo(() => {
+    return months.map(ym => {
+      const mTxs = txList.filter(t=>t.date.startsWith(ym));
+      const income  = mTxs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+      const expense = mTxs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+      return { ym, income, expense, count: mTxs.filter(t=>t.type==='expense').length };
+    });
+  }, [txList, months]);
+
+  const maxVal = useMemo(() => Math.max(...monthStats.map(s=>Math.max(s.income,s.expense)),1), [monthStats]);
+
+  // 평균 지출
+  const avgExp = useMemo(() => {
+    const nonZero = monthStats.filter(s=>s.expense>0);
+    return nonZero.length ? nonZero.reduce((s,m)=>s+m.expense,0)/nonZero.length : 0;
+  }, [monthStats]);
+
+  // 상세 뷰 (월 클릭)
+  if (detail) {
+    const dTxs = txList.filter(t=>t.date.startsWith(detail));
+    return (
+      <div className="screen">
+        <div className="page-header" style={{paddingBottom:8}}>
+          <button className="back-btn" onClick={()=>setDetail(null)}>
+            <Icons.Back/> 월별
+          </button>
+          <div className="page-title" style={{marginTop:8}}>{fmtYM(detail)}</div>
+          <div className="page-sub">
+            지출 {fmt(dTxs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0))}원 · {dTxs.filter(t=>t.type==='expense').length}건
+          </div>
+        </div>
+        <TxGrouped txList={dTxs} onTxClick={onTxClick}/>
+      </div>
+    );
+  }
+
+  return (
+    <div className="screen">
+      <div className="page-header">
+        <div className="page-title">월별 추이</div>
+        <div className="page-sub">최근 12개월</div>
+      </div>
+
+      {/* 요약 */}
+      <div className="monthly-stats">
+        <div className="monthly-stat-card">
+          <div className="mstat-label">월 평균 지출</div>
+          <div className="mstat-val">{fmt(avgExp)}원</div>
+        </div>
+        <div className="monthly-stat-card">
+          <div className="mstat-label">전월 대비</div>
+          {(() => {
+            const cur = monthStats[0]?.expense || 0;
+            const prv = monthStats[1]?.expense || 0;
+            const diff = cur - prv;
+            if (!prv) return <div className="mstat-val">-</div>;
+            return <div className={`mstat-val ${diff>0?'up':'down'}`}>{diff>0?'+':''}{fmt(diff)}원 {diff>0?'↑':'↓'}</div>;
+          })()}
+        </div>
+      </div>
+
+      {/* 바 차트 (최근 6개월) */}
+      <div className="chart-container">
+        <div className="chart-bars">
+          {monthStats.slice(0,6).reverse().map(s => {
+            const ih = Math.round((s.income/maxVal)*90);
+            const eh = Math.round((s.expense/maxVal)*90);
+            const ml = s.ym.split('-')[1]+'월';
+            return (
+              <div key={s.ym} className="chart-col2" onClick={()=>setDetail(s.ym)} style={{cursor:'pointer'}}>
+                <div className="bar-pair2">
+                  <div className="bar-in2" style={{height:`${ih||2}px`}}/>
+                  <div className="bar-ex2" style={{height:`${eh||2}px`}}/>
+                </div>
+                <div className="chart-mlabel">{ml}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="chart-legend-row">
+          <div className="cl-item"><div className="cl-dot2" style={{background:'var(--income)',opacity:.75}}/> 수입</div>
+          <div className="cl-item"><div className="cl-dot2" style={{background:'var(--ink)',opacity:.8}}/> 지출</div>
+        </div>
+      </div>
+
+      {/* 월별 리스트 */}
+      <div className="section-title">월별 상세</div>
+      <div className="month-list-card">
+        {monthStats.map((s,i) => {
+          const prev = monthStats[i+1];
+          const diff = prev ? s.expense - prev.expense : null;
+          return (
+            <div key={s.ym} className="month-list-item" onClick={()=>setDetail(s.ym)}>
+              <div>
+                <div className="ml-month">{fmtYM(s.ym)}</div>
+                <div className="ml-detail">지출 {s.count}건</div>
+              </div>
+              <div className="ml-right">
+                <div className="ml-expense">{fmt(s.expense)}원</div>
+                {diff !== null && s.expense > 0 && (
+                  <div className={`ml-diff ${diff>0?'up':'down'}`}>
+                    전월 대비 {diff>0?'+':''}{fmt(Math.abs(diff))} {diff>0?'↑':'↓'}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   TAB 5: 설정
+══════════════════════════════════════════════ */
+function TabSettings({ txList, settings, onSettingsChange }) {
+  // 이번 달 지출
+  const ym = thisMonth();
+  const mTxs = txList.filter(t=>t.date.startsWith(ym)&&t.type==='expense');
+  const totalExp = mTxs.reduce((s,t)=>s+t.amount,0);
+
+  // 카테고리별 지출
+  const catExp = useMemo(() => {
+    const r = {};
+    mTxs.forEach(t => { r[t.category] = (r[t.category]||0)+t.amount; });
+    return r;
+  }, [mTxs]);
+
+  function toggleSetting(key) {
+    const ns = {...settings, [key]:!settings[key]};
+    onSettingsChange(ns);
+  }
+
+  function exportCSV() {
+    const header = '날짜,구분,금액,결제수단,카테고리,비용처,주체,메모';
+    const rows = txList.map(t =>
+      `${t.date},${t.type==='income'?'수입':'지출'},${t.amount},${t.method},${t.category},${t.place||''},${t.subject||''},${t.memo||''}`
+    );
+    const csv = [header,...rows].join('\n');
+    const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href=url; a.download=`가계부_${today()}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function backupJSON() {
+    const blob = new Blob([JSON.stringify(txList,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href=url; a.download=`가계부_백업_${today()}.json`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function restoreJSON() {
+    const input = document.createElement('input');
+    input.type='file'; input.accept='.json';
+    input.onchange = e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (Array.isArray(data)) {
+            saveData(data);
+            window.location.reload();
+          }
+        } catch { alert('올바른 백업 파일이 아닙니다.'); }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }
+
+  const budgetPct = settings.totalBudget ? Math.min(totalExp/settings.totalBudget*100,100) : 0;
+  const catBudgetItems = Object.entries(settings.catBudgets||{});
+
+  return (
+    <div className="screen">
+      <div className="page-header">
+        <div className="page-title">설정</div>
+      </div>
+
+      {/* 예산 */}
+      <div className="settings-group">
+        <div className="settings-group-title">이번 달 예산</div>
+        <div className="settings-list">
+          <div className="budget-item" style={{borderTop:'none'}}>
+            <div className="budget-top">
+              <div className="budget-name">전체 예산</div>
+              <div className="budget-nums">{fmt(totalExp)} / {fmt(settings.totalBudget)}원</div>
+            </div>
+            <div className="budget-track">
+              <div className={`budget-fill ${budgetPct>=100?'over':''}`} style={{width:`${budgetPct}%`}}/>
+            </div>
+          </div>
+          {catBudgetItems.map(([cat, budget]) => {
+            const exp = catExp[cat]||0;
+            const pct = budget ? Math.min(exp/budget*100,100) : 0;
+            return (
+              <div key={cat} className="budget-item">
+                <div className="budget-top">
+                  <div className="budget-name">{cat}</div>
+                  <div className="budget-nums">{fmt(exp)} / {fmt(budget)}원</div>
+                </div>
+                <div className="budget-track">
+                  <div className={`budget-fill ${pct>=100?'over':''}`} style={{width:`${pct}%`}}/>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 알림 */}
+      <div className="settings-group">
+        <div className="settings-group-title">알림</div>
+        <div className="settings-list">
+          <div className="settings-item">
+            <div className="settings-label">예산 초과 경고</div>
+            <button className={`toggle-sw ${settings.budgetAlert?'on':''}`} onClick={()=>toggleSetting('budgetAlert')}/>
+          </div>
+          <div className="settings-item">
+            <div className="settings-label">월말 지출 리포트</div>
+            <button className={`toggle-sw ${settings.monthReport?'on':''}`} onClick={()=>toggleSetting('monthReport')}/>
+          </div>
+        </div>
+      </div>
+
+      {/* 데이터 */}
+      <div className="settings-group">
+        <div className="settings-group-title">데이터 관리</div>
+        <div className="settings-list">
+          <div className="settings-item" onClick={exportCSV}>
+            <div className="settings-label">CSV로 내보내기</div>
+            <div className="settings-value"><Icons.Chevron/></div>
+          </div>
+          <div className="settings-item" onClick={backupJSON}>
+            <div className="settings-label">백업 (JSON)</div>
+            <div className="settings-value"><Icons.Chevron/></div>
+          </div>
+          <div className="settings-item" onClick={restoreJSON}>
+            <div className="settings-label">백업 파일로 복원</div>
+            <div className="settings-value"><Icons.Chevron/></div>
+          </div>
+        </div>
+      </div>
+
+      {/* 앱 정보 */}
+      <div className="settings-group">
+        <div className="settings-group-title">앱 정보</div>
+        <div className="settings-list">
+          <div className="settings-item">
+            <div className="settings-label">총 거래 내역</div>
+            <div className="settings-value">{txList.length}건</div>
+          </div>
+          <div className="settings-item">
+            <div className="settings-label">버전</div>
+            <div className="settings-value">1.0.0</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{height:8}}/>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   메인 앱
+══════════════════════════════════════════════ */
+function App() {
+  const [tab, setTab]           = useState(0);
+  const [txList, setTxList]     = useState(() => loadData());
+  const [settings, setSettings] = useState(() => loadSettings());
+  const [showInput, setShowInput]   = useState(false);
+  const [editTx, setEditTx]         = useState(null);
+  const [detailTx, setDetailTx]     = useState(null);
+  const [toast, setToast]           = useState('');
+  const toastTimer = useRef(null);
+
+  // 거래 목록 변경 시 저장
+  useEffect(() => { saveData(txList); }, [txList]);
+  useEffect(() => { saveSettings(settings); }, [settings]);
+
+  function showToast(msg) {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(''), 2000);
+  }
+
+  function handleSave(tx) {
+    setTxList(prev => {
+      const exists = prev.find(t => t.id === tx.id);
+      if (exists) return prev.map(t => t.id===tx.id ? tx : t);
+      return [...prev, tx];
+    });
+    setShowInput(false);
+    setEditTx(null);
+    showToast(editTx ? '수정했습니다' : '저장했습니다');
+  }
+
+  function handleDelete(id) {
+    setTxList(prev => prev.filter(t => t.id !== id));
+    setDetailTx(null);
+    showToast('삭제했습니다');
+  }
+
+  function handleTxClick(tx) { setDetailTx(tx); }
+
+  function handleEdit(tx) { setDetailTx(null); setEditTx(tx); setShowInput(true); }
+
+  const tabs = [
+    { label:'홈',   Icon: Icons.Home },
+    { label:'내역', Icon: Icons.List },
+    { label:'통계', Icon: Icons.Chart },
+    { label:'월별', Icon: Icons.Calendar },
+    { label:'설정', Icon: Icons.Settings },
+  ];
+
+  return (
+    <>
+      {/* 탭 컨텐츠 */}
+      {tab === 0 && <TabHome    txList={txList} onTxClick={handleTxClick} />}
+      {tab === 1 && <TabList   txList={txList} onTxClick={handleTxClick} />}
+      {tab === 2 && <TabStats  txList={txList} />}
+      {tab === 3 && <TabMonthly txList={txList} onTxClick={handleTxClick} />}
+      {tab === 4 && <TabSettings txList={txList} settings={settings} onSettingsChange={setSettings} />}
+
+      {/* FAB (설정 탭 제외) */}
+      {tab !== 4 && (
+        <button className="fab" onClick={() => { setEditTx(null); setShowInput(true); }}>+</button>
+      )}
+
+      {/* 탭바 */}
+      <div className="tabbar">
+        {tabs.map(({ label, Icon }, i) => (
+          <button key={i} className={`tab-btn ${tab===i?'active':''}`} onClick={() => setTab(i)}>
+            <Icon/>
+            <span>{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* 입력 모달 */}
+      {showInput && (
+        <InputModal
+          onClose={() => { setShowInput(false); setEditTx(null); }}
+          onSave={handleSave}
+          editTx={editTx}
+        />
+      )}
+
+      {/* 상세 모달 */}
+      {detailTx && (
+        <TxDetailModal
+          tx={detailTx}
+          onClose={() => setDetailTx(null)}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+      )}
+
+      {/* 토스트 */}
+      {toast && <div className="toast">{toast}</div>}
+    </>
+  );
+}
+
+ReactDOM.render(<App/>, document.getElementById('root'));
+</script>
+</body>
+</html>
