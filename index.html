@@ -315,11 +315,11 @@ const SETTINGS_KEY = 'ai_budget_settings_v2';
 
 // 결제수단: 대분류 → 상세수단
 const METHOD_GROUPS = {
-  '현금': ['현금', '계좌이체'],
-  '카드': ['삼성카드','신한카드','현대카드','KB카드','롯데카드','하나카드','우리카드','기타카드']
+  '현금': ['현금'],
+  '카드': ['삼성카드','롯데카드']
 };
 const ALL_METHODS = Object.values(METHOD_GROUPS).flat();
-const CATEGORIES_EXPENSE = ['식비','카페','교통','생활','쇼핑','의료','교육','주거','여가','골프','업무비','기타'];
+const CATEGORIES_EXPENSE = ['식비','카페','교통','생활','쇼핑','의료','교육','주거','여가','골프','교제비','업무비','기타'];
 const CATEGORIES_INCOME  = ['급여','용돈/송금','부수입','기타수입'];
 const SUBJECTS = ['개인','생활비','업무'];
 
@@ -393,14 +393,8 @@ const CAT_KEYWORDS = {
 const INCOME_KEYWORDS = ['급여','월급','보너스','상여','용돈','송금','환급','환불','수당','알바','부수입','이자','배당','임대','연금'];
 const METHOD_KW = {
   '삼성카드':['삼성카드','samsung'],
-  '신한카드':['신한카드','신한'],
-  '현대카드':['현대카드','현대'],
-  'KB카드':['kb카드','국민카드','kb'],
   '롯데카드':['롯데카드','롯데'],
-  '하나카드':['하나카드','하나'],
-  '우리카드':['우리카드','우리'],
-  '계좌이체':['이체','계좌이체','무통장','송금'],
-  '현금':['현금'],
+  '현금':['현금','이체','계좌이체','무통장','송금'],
 };
 
 function parseKoreanAmount(text) {
@@ -437,7 +431,7 @@ function guessMethod(text) {
     for (const kw of kws) if (t.includes(kw)) return method;
   }
   // 카드 키워드만 있는 경우
-  if (/카드/.test(t)) return '기타카드';
+  if (/카드/.test(t)) return '삼성카드';
   return '현금';
 }
 function guessCategory(text, isIncome) {
