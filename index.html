@@ -432,10 +432,12 @@ function TxGrouped({ txList, onTxClick }) {
 
 /* ══ 입력 모달 ══ */
 function InputModal({ onClose, onSave, editTx }) {
-  // 키보드의 '다음/이동' 키(Enter)를 누르면 다음 입력칸으로 이동
+  // 키보드의 '이동/다음' 키(Enter): 금액 칸은 키보드 닫기, 그 외는 다음 입력칸으로 이동
   function handleEnterNext(e) {
     if (e.key!=='Enter' || !['INPUT','SELECT'].includes(e.target.tagName)) return;
     e.preventDefault();
+    // 금액 칸: 키보드만 닫아서 결제수단을 바로 고를 수 있게 함
+    if (e.target.type==='number') { e.target.blur(); return; }
     const fields = [...e.currentTarget.querySelectorAll('input, select')];
     const next = fields[fields.indexOf(e.target)+1];
     if (!next) { e.target.blur(); return; }
@@ -479,7 +481,7 @@ function InputModal({ onClose, onSave, editTx }) {
             </div>
             <div className="form-group">
               <div className="input-label">금액 (원)</div>
-              <input type="number" className="input-field" placeholder="0" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} inputMode="numeric" enterKeyHint="next" autoFocus={!editTx}/>
+              <input type="number" className="input-field" placeholder="0" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} inputMode="numeric" enterKeyHint="go" autoFocus={!editTx}/>
             </div>
             {/* 결제수단: 대분류 → 상세 */}
             <div className="form-group">
