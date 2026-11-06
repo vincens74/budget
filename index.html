@@ -97,7 +97,6 @@ body{font-family:-apple-system,'Apple SD Gothic Neo','Pretendard',sans-serif;bac
 /* 입력 */
 .input-field{width:100%;background:var(--bg);border:none;outline:none;border-radius:var(--radius-sm);padding:13px 14px;font-size:15px;color:var(--ink);font-family:inherit;resize:none}
 .input-label{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
-.input-hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.6}
 .select-field{width:100%;background:var(--bg);border:none;outline:none;border-radius:var(--radius-sm);padding:13px 14px;font-size:15px;color:var(--ink);font-family:inherit;-webkit-appearance:none}
 
 /* 파싱 결과 카드 */
@@ -105,15 +104,6 @@ body{font-family:-apple-system,'Apple SD Gothic Neo','Pretendard',sans-serif;bac
 .parse-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--divider)}
 .parse-row:last-child{border-bottom:none}
 .parse-key{font-size:12px;color:var(--muted);flex-shrink:0;margin-right:12px}
-.parse-edit-input{background:none;border:none;border-bottom:1.5px solid var(--divider);outline:none;font-size:13px;font-weight:600;color:var(--ink);font-family:inherit;text-align:right;width:180px;padding:2px 4px;transition:border-color .15s}
-.parse-edit-input:focus{border-bottom-color:var(--ink)}
-.parse-edit-input[type="number"]{-moz-appearance:textfield}
-.parse-edit-input[type="number"]::-webkit-inner-spin-button,.parse-edit-input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none}
-.parse-edit-select{background:none;border:none;border-bottom:1.5px solid var(--divider);outline:none;font-size:13px;font-weight:600;color:var(--ink);font-family:inherit;text-align:right;padding:2px 4px;cursor:pointer;-webkit-appearance:none;max-width:180px}
-.parse-edit-select:focus{border-bottom-color:var(--ink)}
-.parse-seg{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
-.parse-seg-btn{padding:3px 10px;border-radius:8px;border:1.5px solid var(--divider);background:none;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit;transition:all .12s}
-.parse-seg-btn.active{background:var(--ink);color:#fff;border-color:var(--ink)}
 
 /* 버튼 */
 .btn-row{display:flex;gap:8px;margin-top:12px}
@@ -271,9 +261,6 @@ body{font-family:-apple-system,'Apple SD Gothic Neo','Pretendard',sans-serif;bac
 .search-bar input{flex:1;border:none;outline:none;font-size:15px;color:var(--ink);background:transparent;font-family:inherit}
 .search-bar input::placeholder{color:var(--muted)}
 
-/* 스피너 */
-.spinner{width:20px;height:20px;border:2px solid var(--divider);border-top-color:var(--ink);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
-@keyframes spin{to{transform:rotate(360deg)}}
 
 /* 토스트 */
 .toast{position:fixed;bottom:calc(var(--tab-h) + var(--safe-bot) + 80px);left:50%;transform:translateX(-50%);background:var(--ink2);color:#fff;padding:12px 20px;border-radius:24px;font-size:14px;font-weight:600;z-index:300;animation:fadeUp .25s ease;white-space:nowrap}
@@ -377,120 +364,6 @@ function loadSettings() {
 }
 function saveSettings(s){try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(s));}catch{}}
 
-/* ══ 정규식 파서 ══ */
-const CAT_KEYWORDS = {
-  '카페':  ['카페','커피','스타벅스','이디야','빽다방','투썸','아메리카노','라떼','할리스','폴바셋','커피빈','메가커피'],
-  '식비':  ['식당','밥','점심','저녁','아침','식사','분식','김밥','치킨','피자','햄버거','맥도날드','버거킹','롯데리아','도미노','bbq','굽네','교촌','한식','중식','일식','국밥','냉면','갈비','삼겹','곱창','족발','보쌈','순대','떡볶이','라면','우동','파스타','스테이크','초밥','설렁탕','해장국','백반','뷔페','레스토랑','음식점','식보'],
-  '교통':  ['주유','기름','주유소','gs칼텍스','sk에너지','현대오일','에쓰오일','버스','지하철','택시','카카오택시','ktx','기차','고속버스','항공','비행기','주차','톨비','하이패스','정비','세차','쏘카','그린카'],
-  '생활':  ['마트','이마트','홈플러스','롯데마트','코스트코','편의점','gs25','cu','세븐일레븐','미니스톱','이마트24','다이소','올리브영','약국','생필품','생활용품','청소','세제','휴지','비누','샴푸','치약','칫솔'],
-  '쇼핑':  ['쇼핑','의류','옷','신발','가방','패션','무신사','쿠팡','11번가','g마켓','옥션','배달의민족','배민','요기요','쿠팡이츠','온라인','알리','테무'],
-  '의료':  ['병원','의원','한의원','치과','안과','내과','외과','피부과','이비인후과','처방','진료','검사','수술','입원','주사','의료'],
-  '교육':  ['학원','과외','교육','수업','강의','책','교재','문제집','인강','독서','도서','등록금','수강'],
-  '주거':  ['월세','전세','관리비','전기','가스','수도','인터넷','통신','핸드폰','휴대폰','kt','sk통신','lg유플러스','인테리어','가구','가전'],
-  '여가':  ['영화','cgv','롯데시네마','메가박스','공연','연극','뮤지컬','콘서트','노래방','pc방','여행','숙박','호텔','펜션','레저','스포츠','헬스','요가','골프','등산','낚시','캠핑'],
-  '업무비':['업무','출장','접대','회식','사무','문구','복사','인쇄','택배','배송','우편'],
-};
-const INCOME_KEYWORDS = ['급여','월급','보너스','상여','용돈','송금','환급','환불','수당','알바','부수입','이자','배당','임대','연금'];
-const METHOD_KW = {
-  '삼성카드':['삼성카드','samsung'],
-  '롯데카드':['롯데카드','롯데'],
-  '현금':['현금','이체','계좌이체','무통장','송금'],
-};
-
-function parseKoreanAmount(text) {
-  let m = text.match(/(\d[\d,]*)\s*원/);
-  if (m) return parseInt(m[1].replace(/,/g,''));
-  m = text.match(/(\d+)\s*만\s*(\d+)?\s*천?/);
-  if (m) return parseInt(m[1])*10000 + (m[2]?parseInt(m[2])*1000:0);
-  m = text.match(/(\d+)\s*만/);
-  if (m) return parseInt(m[1])*10000;
-  m = text.match(/(\d+)\s*천/);
-  if (m) return parseInt(m[1])*1000;
-  m = text.match(/\b(\d{3,})\b/);
-  if (m) return parseInt(m[1]);
-  return null;
-}
-function parseDate(text) {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const pad = n => String(n).padStart(2,'0');
-  const toStr = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  if (/오늘/.test(text)) return today();
-  if (/어제/.test(text)) return toStr(new Date(now-86400000));
-  if (/그제|그저께/.test(text)) return toStr(new Date(now-172800000));
-  let m = text.match(/(\d{1,2})[\/\.](\d{1,2})/);
-  if (!m) m = text.match(/(\d{1,2})월\s*(\d{1,2})일?/);
-  if (m) return `${yyyy}-${pad(parseInt(m[1]))}-${pad(parseInt(m[2]))}`;
-  m = text.match(/(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return m[0];
-  return today();
-}
-function guessMethod(text) {
-  const t = text.toLowerCase();
-  for (const [method, kws] of Object.entries(METHOD_KW)) {
-    for (const kw of kws) if (t.includes(kw)) return method;
-  }
-  // 카드 키워드만 있는 경우
-  if (/카드/.test(t)) return '삼성카드';
-  return '현금';
-}
-function guessCategory(text, isIncome) {
-  const t = text.toLowerCase();
-  if (isIncome) {
-    if (/급여|월급|보너스|상여/.test(t)) return '급여';
-    if (/용돈|송금/.test(t)) return '용돈/송금';
-    if (/알바|부수입/.test(t)) return '부수입';
-    return '기타수입';
-  }
-  for (const [cat, kws] of Object.entries(CAT_KEYWORDS)) {
-    for (const kw of kws) if (t.includes(kw)) return cat;
-  }
-  return '기타';
-}
-function guessSubject(text) {
-  if (/생활비|생활/.test(text)) return '생활비';
-  if (/업무|회사|법인|출장|접대/.test(text)) return '업무';
-  return '개인';
-}
-function isIncomeText(text) {
-  return INCOME_KEYWORDS.some(kw => text.toLowerCase().includes(kw));
-}
-function guessPlace(text) {
-  let t = text;
-  t = t.replace(/\d{1,2}[\/\.]\d{1,2}/, '');
-  t = t.replace(/\d{1,2}월\s*\d{1,2}일?/, '');
-  t = t.replace(/오늘|어제|그제|그저께/, '');
-  t = t.replace(/\d[\d,]*\s*원/, '');
-  t = t.replace(/\d+\s*만\s*\d*\s*천?/, '');
-  t = t.replace(/\d+\s*만/, '');
-  t = t.replace(/\d+\s*천/, '');
-  t = t.replace(/\b\d{3,}\b/, '');
-  for (const kws of Object.values(METHOD_KW)) for (const kw of kws) t = t.replace(new RegExp(kw,'gi'),' ');
-  t = t.replace(/개인|생활비|생활|업무/, '');
-  t = t.replace(/[,·\-\/\.]/g,' ').replace(/\s+/g,' ').trim();
-  const tokens = t.split(' ').filter(w=>w.length>=1);
-  return tokens.join(' ');
-}
-function parseWithAI(text) {
-  return new Promise((resolve, reject) => {
-    try {
-      const isIncome = isIncomeText(text);
-      const amount   = parseKoreanAmount(text);
-      if (!amount || amount <= 0) { reject(new Error('금액 없음')); return; }
-      resolve({
-        date:     parseDate(text),
-        type:     isIncome ? 'income' : 'expense',
-        amount,
-        method:   guessMethod(text),
-        category: guessCategory(text, isIncome),
-        place:    guessPlace(text) || guessCategory(text, isIncome),
-        subject:  guessSubject(text),
-        memo:     ''
-      });
-    } catch(e) { reject(e); }
-  });
-}
-
 /* ══ SVG 아이콘 ══ */
 const Icons = {
   Home: () => <svg viewBox="0 0 24 24" fill="none"><path d="M3 9.5L12 3l9 6.5V21a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" fill="currentColor" opacity=".85"/><rect x="9" y="13" width="6" height="9" rx="1" fill="white" opacity=".9"/></svg>,
@@ -559,27 +432,11 @@ function TxGrouped({ txList, onTxClick }) {
 
 /* ══ 입력 모달 ══ */
 function InputModal({ onClose, onSave, editTx }) {
-  const [mode, setMode] = useState(editTx ? 'form' : 'text');
-  const [inputText, setInputText] = useState('');
-  const [parsing, setParsing] = useState(false);
-  const [parsed, setParsed] = useState(null);
-  const [parseError, setParseError] = useState('');
   const [form, setForm] = useState(editTx || {
     type:'expense', date:today(), amount:'', method:'현금',
     category:'식비', place:'', subject:'개인', memo:''
   });
 
-  async function handleParse() {
-    if (!inputText.trim()) return;
-    setParsing(true); setParseError('');
-    try { setParsed(await parseWithAI(inputText.trim())); }
-    catch { setParseError('금액을 찾지 못했습니다. 금액(예: 12000원)을 포함해 다시 입력해 주세요.'); }
-    finally { setParsing(false); }
-  }
-  function handleSaveParsed() {
-    if (!parsed) return;
-    onSave({...parsed, id: editTx?.id || genId()});
-  }
   function handleSaveForm() {
     if (!form.amount || !form.date) return;
     onSave({...form, amount:Number(String(form.amount).replace(/,/g,'')), id:editTx?.id||genId()});
@@ -599,107 +456,6 @@ function InputModal({ onClose, onSave, editTx }) {
         <div className="modal-handle"/>
         <div className="modal-title">{editTx?'내역 수정':'내역 입력'}</div>
 
-        {!editTx && (
-          <div className="form-group">
-            <div className="seg-ctrl">
-              <button className={`seg-btn ${mode==='text'?'active':''}`} onClick={()=>{setMode('text');setParsed(null);}}>자동 인식</button>
-              <button className={`seg-btn ${mode==='form'?'active':''}`} onClick={()=>setMode('form')}>직접 입력</button>
-            </div>
-          </div>
-        )}
-
-        {/* 자동 인식 */}
-        {mode==='text' && (
-          <>
-            <div className="form-group">
-              <div className="input-label">자유롭게 입력</div>
-              <textarea className="input-field" rows={3}
-                placeholder="예) 6/13 삼성카드 12000원 다이소 개인"
-                value={inputText}
-                onChange={e=>{setInputText(e.target.value);setParsed(null);}}/>
-              <div className="input-hint">
-                날짜 · 결제수단 · 금액 · 비용처 · 주체를 자유로운 순서로 입력하세요.<br/>
-                예) 6/13 삼성카드 12000원 다이소 개인<br/>
-                예) 어제 현금 5천 편의점 생활비<br/>
-                ※ 금액은 반드시 포함해야 합니다.
-              </div>
-            </div>
-            {parseError && <div style={{color:'var(--danger)',fontSize:13,marginBottom:8}}>{parseError}</div>}
-            {parsing && <div style={{padding:'16px 0'}}><div className="spinner"/></div>}
-
-            {parsed && !parsing && (
-              <>
-                <div className="parse-card">
-                  <div className="parse-row">
-                    <span className="parse-key">날짜</span>
-                    <input type="date" className="parse-edit-input" value={parsed.date}
-                      onChange={e=>setParsed(p=>({...p,date:e.target.value}))}/>
-                  </div>
-                  <div className="parse-row">
-                    <span className="parse-key">구분</span>
-                    <div className="parse-seg">
-                      <button className={`parse-seg-btn ${parsed.type==='expense'?'active':''}`}
-                        onClick={()=>setParsed(p=>({...p,type:'expense',category:CATEGORIES_EXPENSE.includes(p.category)?p.category:'식비'}))}>지출</button>
-                      <button className={`parse-seg-btn ${parsed.type==='income'?'active':''}`}
-                        onClick={()=>setParsed(p=>({...p,type:'income',category:CATEGORIES_INCOME.includes(p.category)?p.category:'급여'}))}>수입</button>
-                    </div>
-                  </div>
-                  <div className="parse-row">
-                    <span className="parse-key">금액</span>
-                    <input type="number" className="parse-edit-input" inputMode="numeric" value={parsed.amount}
-                      onChange={e=>setParsed(p=>({...p,amount:Number(e.target.value)}))}/>
-                  </div>
-                  <div className="parse-row">
-                    <span className="parse-key">결제수단</span>
-                    <select className="parse-edit-select" value={parsed.method}
-                      onChange={e=>setParsed(p=>({...p,method:e.target.value}))}>
-                      {ALL_METHODS.map(m=><option key={m}>{m}</option>)}
-                    </select>
-                  </div>
-                  <div className="parse-row">
-                    <span className="parse-key">카테고리</span>
-                    <select className="parse-edit-select" value={parsed.category}
-                      onChange={e=>setParsed(p=>({...p,category:e.target.value}))}>
-                      {(parsed.type==='expense'?CATEGORIES_EXPENSE:CATEGORIES_INCOME).map(c=><option key={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div className="parse-row">
-                    <span className="parse-key">비용처</span>
-                    <input type="text" className="parse-edit-input" value={parsed.place}
-                      onChange={e=>setParsed(p=>({...p,place:e.target.value}))}/>
-                  </div>
-                  <div className="parse-row">
-                    <span className="parse-key">주체</span>
-                    <div className="parse-seg">
-                      {SUBJECTS.map(s=>(
-                        <button key={s} className={`parse-seg-btn ${parsed.subject===s?'active':''}`}
-                          onClick={()=>setParsed(p=>({...p,subject:s}))}>{s}</button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="parse-row">
-                    <span className="parse-key">메모</span>
-                    <input type="text" className="parse-edit-input" placeholder="선택" value={parsed.memo||''}
-                      onChange={e=>setParsed(p=>({...p,memo:e.target.value}))}/>
-                  </div>
-                </div>
-                <div className="btn-row">
-                  <button className="btn btn-secondary" onClick={()=>setParsed(null)}>다시 입력</button>
-                  <button className="btn btn-primary" onClick={handleSaveParsed}>저장</button>
-                </div>
-              </>
-            )}
-            {!parsed && !parsing && (
-              <div className="btn-row">
-                <button className="btn btn-secondary" onClick={onClose}>취소</button>
-                <button className="btn btn-primary" onClick={handleParse} disabled={!inputText.trim()}>분석</button>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* 직접 입력 */}
-        {mode==='form' && (
           <>
             <div className="form-group">
               <div className="seg-ctrl">
@@ -757,7 +513,6 @@ function InputModal({ onClose, onSave, editTx }) {
               <button className="btn btn-primary" onClick={handleSaveForm} disabled={!form.amount||!form.date}>저장</button>
             </div>
           </>
-        )}
         <div style={{height:8}}/>
       </div>
     </div>
