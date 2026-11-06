@@ -432,6 +432,10 @@ function TxGrouped({ txList, onTxClick }) {
 
 /* ══ 입력 모달 ══ */
 function InputModal({ onClose, onSave, editTx }) {
+  // 새 내역은 3단계(금액 → 결제수단 → 나머지), 수정은 한 화면
+  const [step, setStep] = useState(1);
+  const showAll = !!editTx;
+  const showStep = n => showAll || step===n;
   const [form, setForm] = useState(editTx || {
     type:'expense', date:today(), amount:'', method:'현금',
     category:'식비', place:'', subject:'개인', memo:''
@@ -455,8 +459,10 @@ function InputModal({ onClose, onSave, editTx }) {
       <div className="modal-sheet">
         <div className="modal-handle"/>
         <div className="modal-title">{editTx?'내역 수정':'내역 입력'}</div>
+        {!showAll && <div className="input-hint" style={{marginTop:-8,marginBottom:12}}>{step} / 3 단계</div>}
 
           <>
+            {showStep(1) && <>
             <div className="form-group">
               <div className="seg-ctrl">
                 <button className={`seg-btn ${form.type==='expense'?'active':''}`} onClick={()=>setForm(f=>({...f,type:'expense',category:'식비'}))}>지출</button>
@@ -469,8 +475,10 @@ function InputModal({ onClose, onSave, editTx }) {
             </div>
             <div className="form-group">
               <div className="input-label">금액 (원)</div>
-              <input type="number" className="input-field" placeholder="0" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} inputMode="numeric"/>
+              <input type="number" className="input-field" placeholder="0" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} inputMode="numeric" autoFocus={!showAll}/>
             </div>
+            </>}
+            {showStep(2) && <>
             {/* 결제수단: 대분류 → 상세 */}
             <div className="form-group">
               <div className="input-label">결제수단</div>
@@ -486,6 +494,8 @@ function InputModal({ onClose, onSave, editTx }) {
                 {(METHOD_GROUPS[methodGroup2]||[]).map(m=><option key={m}>{m}</option>)}
               </select>
             </div>
+            </>}
+            {showStep(3) && <>
             <div className="form-group">
               <div className="input-label">카테고리</div>
               <select className="select-field" value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>
@@ -508,9 +518,14 @@ function InputModal({ onClose, onSave, editTx }) {
               <div className="input-label">메모 (선택)</div>
               <input type="text" className="input-field" placeholder="추가 메모" value={form.memo||''} onChange={e=>setForm(f=>({...f,memo:e.target.value}))}/>
             </div>
+            </>}
             <div className="btn-row">
-              <button className="btn btn-secondary" onClick={onClose}>취소</button>
-              <button className="btn btn-primary" onClick={handleSaveForm} disabled={!form.amount||!form.date}>저장</button>
+              {step===1 || showAll
+                ? <button className="btn btn-secondary" onClick={onClose}>취소</button>
+                : <button className="btn btn-secondary" onClick={()=>setStep(step-1)}>이전</button>}
+              {showAll || step===3
+                ? <button className="btn btn-primary" onClick={handleSaveForm} disabled={!form.amount||!form.date}>저장</button>
+                : <button className="btn btn-primary" onClick={()=>setStep(step+1)} disabled={step===1&&(!form.amount||Number(form.amount)<=0||!form.date)}>다음</button>}
             </div>
           </>
         <div style={{height:8}}/>
